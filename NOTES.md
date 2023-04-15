@@ -28,3 +28,11 @@
 - Rc
   - but is not thread-safe
 - Arc (Atomically reference counted)
+
+### Send and Sync
+- Send
+  - `T` is `Send` if it can be *sent* to another thread. If ownership can be transferred to another thread. `Arc<i32>` is `Send` but `Rc<i32>` is not.
+- Sync
+  - `T` is `Sync` if it can be *shared* with another thread. If and only if a shared reference of that type `&T`, is `Send`. `i32` is `Sync` but `Cell<i32>` is not. (`Cell<i32>` is `Send`, however.)
+- All primitive types, such as `i32`, `bool`, and `str` are `Send` and `Sync`.
+- `Send` and `Sync` are **auto traits**, which means they are automatically implemented on `T` based on its fields. A `struct` with fields that are all `Send` and `Sync` also has those traits.
