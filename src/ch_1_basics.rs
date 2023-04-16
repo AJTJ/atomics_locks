@@ -257,6 +257,7 @@ pub fn condvar_usage() {
     })
 }
 
+// NOTE This probably doesn't make sense. Better to have a hashmap of things, or something else.
 pub fn another_condvar_usage() {
     let queue: Mutex<VecDeque<Foo>> = Mutex::new(VecDeque::new());
 
@@ -271,7 +272,9 @@ pub fn another_condvar_usage() {
         // Orange thread
         s.spawn(|| loop {
             let mut q = queue.lock().unwrap();
+            for item in q.iter_mut() {}
             // loop over the queue and pop all the oranges
+            // NOTE This probably doesn't make sense. Better to have a hashmap of things, or something else.
         });
 
         // Apple thread
