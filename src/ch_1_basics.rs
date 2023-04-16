@@ -261,8 +261,8 @@ pub fn another_condvar_usage() {
     let queue: Mutex<VecDeque<Foo>> = Mutex::new(VecDeque::new());
 
     enum Foo {
-        Apple,
-        Orange,
+        Apple(String),
+        Orange(String),
     }
     let containes_orange = Condvar::new();
     let contains_apple = Condvar::new();
@@ -283,11 +283,17 @@ pub fn another_condvar_usage() {
 
     for i in 0..25 {
         if i % 3 == 0 {
-            queue.lock().unwrap().push_back(Foo::Apple);
+            queue
+                .lock()
+                .unwrap()
+                .push_back(Foo::Apple("Yum - ".to_string() + &i.to_string()));
             contains_apple.notify_one();
             thread::sleep(Duration::from_secs(1));
         } else {
-            queue.lock().unwrap().push_back(Foo::Orange);
+            queue
+                .lock()
+                .unwrap()
+                .push_back(Foo::Orange("Orangy - ".to_string() + &i.to_string()));
             containes_orange.notify_one();
             thread::sleep(Duration::from_secs(1));
         }
