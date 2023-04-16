@@ -1,4 +1,3 @@
-use std::time::Duration;
 #[allow(unused)]
 use std::{
     cell::{Cell, RefCell, UnsafeCell},
@@ -15,6 +14,7 @@ use std::{
     thread::{self, sleep, Thread},
     time,
 };
+use std::{time::Duration, vec};
 
 pub fn basics() {
     let numbers = vec![1, 2, 3];
@@ -158,4 +158,138 @@ pub fn mutex_use() {
     println!("mutex_use n: {}", n.lock().unwrap());
 
     assert_eq!(n.into_inner().unwrap(), 1000);
+}
+
+// https://marabos.nl/atomics/basics.html#lifetime-of-mutexguard
+// Lifetime of mutex guard
+
+pub fn mutex_guard_lifetime() {
+    let list = Mutex::new(vec![0]);
+
+    list.lock().unwrap().push(1);
+
+    // Here the lock remains intact for the entire duration of the long_process_fn
+    if let Some(item) = list.lock().unwrap().pop() {
+        // long_process_fn(item)
+        println!("the item: {item}");
+    };
+
+    // the lock is dropped before the long_process_fn, because
+    // the condition of a regular if statement is a always a plain boolean
+    // which does not borrow anything
+    if list.lock().unwrap().pop() == Some(1) {
+        // long_process_fn
+    }
+
+    let item = list.lock().unwrap().pop();
+    // The guard is dropped here before the if let statement
+    if let Some(item) = item {
+        // long_process_fn(item)
+    }
+}
+
+// https://marabos.nl/atomics/basics.html#reader-writer-lock
+// A mutex only allows exclusive access (&mut T)
+// An RwLock can allow for a shared reference (&T)
+// Essentialy the multi-threaded version of RefCell
+
+// https://marabos.nl/atomics/basics.html#waiting
+// Thread Parking
+// a parked thread doesn't consume CPU cycles
+
+/*
+- A couple notes
+    - It would still be correct without parking.
+    - threads can have "spurious wakeups"
+    - A call to "unpark" does not get lost, and rather causes the next "park" request to "unpark", but "unpark" requests do not stack.
+ */
+pub fn thread_parking_queue() {
+    let queue: Mutex<VecDeque<isize>> = Mutex::new(VecDeque::new());
+
+    thread::scope(|s| {
+        // consuming thread
+        let t = s.spawn(|| loop {
+            let item = queue.lock().unwrap().pop_front();
+            if let Some(item) = item {
+                dbg!(item);
+            } else {
+                thread::park();
+            }
+        });
+        // producing thread
+        for i in 0.. {
+            queue.lock().unwrap().push_back(i);
+            t.thread().unpark();
+            thread::sleep(Duration::from_secs(1));
+        }
+    })
+}
+
+// The above example begins to break down with multiple consumers
+// the producer thread has no way of knowing which consumer is actually waiting and which should be woken up.
+// a more sophisticated approach is required
+
+// https://marabos.nl/atomics/basics.html#condvar
+
+pub fn condvar_usage() {
+    let queue: Mutex<VecDeque<isize>> = Mutex::new(VecDeque::new());
+    let not_empty = Condvar::new();
+
+    thread::scope(|s| {
+        s.spawn(|| loop {
+            let mut q = queue.lock().unwrap();
+            let item = loop {
+                if let Some(item) = q.pop_front() {
+                    break item;
+                } else {
+                    q = not_empty.wait(q).unwrap();
+                }
+            };
+            drop(q);
+            dbg!(item);
+        });
+
+        for i in 0..25 {
+            queue.lock().unwrap().push_back(i);
+            not_empty.notify_one();
+            thread::sleep(Duration::from_secs(1));
+        }
+    })
+}
+
+pub fn another_condvar_usage() {
+    let queue: Mutex<VecDeque<Foo>> = Mutex::new(VecDeque::new());
+
+    enum Foo {
+        Apple,
+        Orange,
+    }
+    let containes_orange = Condvar::new();
+    let contains_apple = Condvar::new();
+
+    thread::scope(|s| {
+        // Orange thread
+        s.spawn(|| loop {
+            let mut q = queue.lock().unwrap();
+            // loop over the queue and pop all the oranges
+        });
+
+        // Apple thread
+        s.spawn(|| loop {
+            let mut q = queue.lock().unwrap();
+            // loop over the queue and pop all the apples
+        });
+    });
+
+    for i in 0..25 {
+        if i % 3 == 0 {
+            queue.lock().unwrap().push_back(Foo::Apple);
+            contains_apple.notify_one();
+            thread::sleep(Duration::from_secs(1));
+        } else {
+            queue.lock().unwrap().push_back(Foo::Orange);
+            containes_orange.notify_one();
+            thread::sleep(Duration::from_secs(1));
+        }
+    }
 }
