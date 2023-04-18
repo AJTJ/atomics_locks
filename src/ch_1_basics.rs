@@ -289,14 +289,14 @@ pub fn another_condvar_usage() {
             queue
                 .lock()
                 .unwrap()
-                .push_back(Foo::Apple("Yum - ".to_string() + &i.to_string()));
+                .push_back(Foo::Apple(format!("Yum apple! - {}", i).to_string()));
             contains_apple.notify_one();
             thread::sleep(Duration::from_secs(1));
         } else {
             queue
                 .lock()
                 .unwrap()
-                .push_back(Foo::Orange("Orangy - ".to_string() + &i.to_string()));
+                .push_back(Foo::Apple(format!("Orangy! - {}", i).to_string()));
             containes_orange.notify_one();
             thread::sleep(Duration::from_secs(1));
         }
