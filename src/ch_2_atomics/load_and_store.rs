@@ -61,3 +61,34 @@ pub fn progress_reporting() {
 
     println!("Done");
 }
+
+// https://marabos.nl/atomics/atomics.html#example-progress-reporting-from-multiple-threads
+
+pub fn progress_reporting_multiple_threads() {
+    let num_done = &AtomicUsize::new(0);
+
+    let main_thread = thread::current();
+
+    thread::scope(|s| {
+        for t in 0..4 {
+            s.spawn(move || {
+                thread::sleep(Duration::from_millis(75));
+                for i in 0..25 {
+                    // simulate work being done
+                    println!("thread: {t}, i: {i}");
+                    thread::sleep(Duration::from_millis(75));
+                    num_done.fetch_add(1, Ordering::Relaxed);
+                }
+            });
+        }
+
+        loop {
+            let n = num_done.load(Ordering::Relaxed);
+            if n == 100 {
+                break;
+            }
+            println!("processed {}/100", n);
+            thread::park_timeout(Duration::from_secs(1));
+        }
+    })
+}
